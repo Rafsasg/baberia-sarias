@@ -209,6 +209,11 @@ export default function LandingPage() {
                 WhatsApp
               </Button>
             </a>
+            <a href="/login">
+              <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
+                Soy Barbero
+              </Button>
+            </a>
           </nav>
 
           <Button
@@ -249,11 +254,16 @@ export default function LandingPage() {
                 href="https://wa.me/573182305080"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mt-4"
+                className="mt-2"
               >
                 <Button className="w-full">
                   <Phone className="w-4 h-4 mr-2" />
                   WhatsApp
+                </Button>
+              </a>
+              <a href="/login" onClick={() => setMobileMenu(false)}>
+                <Button variant="outline" className="w-full">
+                  Soy Barbero
                 </Button>
               </a>
             </nav>
