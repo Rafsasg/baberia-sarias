@@ -16,7 +16,7 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import { formatoCOP } from "@/lib/constants"
-import type { Servicio } from "@/types/database"
+import type { ServicioItem } from "@/types/database"
 
 interface ServicioForm {
   slug: string
@@ -37,7 +37,7 @@ const emptyForm: ServicioForm = {
 }
 
 export default function ServiciosPage() {
-  const [servicios, setServicios] = useState<Servicio[]>([])
+  const [servicios, setServicios] = useState<ServicioItem[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -69,7 +69,7 @@ export default function ServiciosPage() {
     setShowModal(true)
   }
 
-  function abrirEditar(s: Servicio) {
+  function abrirEditar(s: ServicioItem) {
     setEditingId(s.id)
     setForm({
       slug: s.slug,
@@ -167,7 +167,7 @@ export default function ServiciosPage() {
     }
   }
 
-  async function toggleActivo(s: Servicio) {
+  async function toggleActivo(s: ServicioItem) {
     await fetch(`/api/servicios/${s.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },

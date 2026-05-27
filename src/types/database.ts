@@ -1,6 +1,6 @@
 export type CitaEstado = "pendiente" | "confirmada" | "cancelada"
 export type CitaTipo = "web" | "presencial"
-export type Servicio = "corte" | "barba" | "combo"
+export type ServicioSlug = "corte" | "barba" | "combo"
 export type MetodoPago = "efectivo" | "transferencia"
 export type TransaccionTipo = "ingreso" | "egreso"
 export type CategoriaEgreso = "suministros" | "servicios" | "marketing" | "otros"
@@ -9,7 +9,7 @@ export interface Cita {
   id: string
   cliente_nombre: string
   cliente_telefono: string | null
-  servicio: Servicio
+  servicio: string
   fecha: string
   hora_inicio: string
   hora_fin: string
@@ -38,7 +38,7 @@ export interface Usuario {
   created_at: string
 }
 
-export interface Servicio {
+export interface ServicioItem {
   id: string
   slug: string
   nombre: string

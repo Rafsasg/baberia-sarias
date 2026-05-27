@@ -27,7 +27,7 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import { HORARIO_INICIO, HORARIO_FIN, formatoCOP } from "@/lib/constants"
-import type { TimeSlot, Servicio } from "@/types/database"
+import type { TimeSlot, ServicioItem } from "@/types/database"
 
 const TESTIMONIOS = [
   { nombre: "Carlos M.", texto: "El mejor corte de mi vida. Ambiente relajado y profesional.", estrellas: 5 },
@@ -69,7 +69,7 @@ export default function LandingPage() {
   const [loadingSlots, setLoadingSlots] = useState(false)
   const [selectedHora, setSelectedHora] = useState("")
   const [selectedServicio, setSelectedServicio] = useState("")
-  const [servicios, setServicios] = useState<Servicio[]>([])
+  const [servicios, setServicios] = useState<ServicioItem[]>([])
   const [formData, setFormData] = useState({ nombre: "", telefono: "" })
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
@@ -84,7 +84,7 @@ export default function LandingPage() {
     fetch("/api/servicios")
       .then((r) => r.json())
       .then((data) => {
-        const activos = (data.servicios || []).filter((s: Servicio) => s.activo)
+        const activos = (data.servicios || []).filter((s: ServicioItem) => s.activo)
         setServicios(activos)
         if (activos.length > 0) setSelectedServicio(activos[0].slug)
       })

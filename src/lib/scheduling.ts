@@ -103,7 +103,7 @@ export async function obtenerSlots(fecha: string): Promise<TimeSlot[]> {
 export async function crearCitaWeb(datos: {
   cliente_nombre: string
   cliente_telefono: string
-  servicio: "corte" | "barba" | "combo"
+  servicio: string
   fecha: string
   hora_inicio: string
   hora_fin: string
@@ -145,7 +145,7 @@ export async function crearCitaWeb(datos: {
 
 export async function crearWalkIn(datos: {
   cliente_nombre: string
-  servicio: "corte" | "barba" | "combo"
+  servicio: string
   fecha: string
   hora_inicio: string
   hora_fin: string
