@@ -49,7 +49,7 @@ export default function DashboardHome() {
   const [slots, setSlots] = useState<TimeSlot[]>([])
   const [loading, setLoading] = useState(true)
   const [showWalkIn, setShowWalkIn] = useState(false)
-  const [serviciosList, setServiciosList] = useState<{ slug: string; nombre: string }[]>([])
+  const [serviciosList, setServiciosList] = useState<{ slug: string; nombre: string; precio: number }[]>([])
   const [walkInForm, setWalkInForm] = useState<{
     cliente_nombre: string
     servicio: string
@@ -70,7 +70,7 @@ export default function DashboardHome() {
     fetch("/api/servicios")
       .then((r) => r.json())
       .then((data) => {
-        const activos = (data.servicios || []).filter((s: { slug: string; nombre: string; activo: boolean }) => s.activo)
+        const activos = (data.servicios || []).filter((s: { slug: string; activo: boolean }) => s.activo)
         setServiciosList(activos)
         if (activos.length > 0 && !activos.find((s: { slug: string }) => s.slug === walkInForm.servicio)) {
           setWalkInForm((prev) => ({ ...prev, servicio: activos[0].slug }))
@@ -101,8 +101,9 @@ export default function DashboardHome() {
     const confirmadas = slotsList.filter((s) => s.estado === "confirmada")
     const pendientes = slotsList.filter((s) => s.estado === "pendiente")
     const ingresos = confirmadas.reduce((sum, s) => {
-      const servicio = s.cita?.servicio || "corte"
-      return sum + (PRECIOS[servicio] || 0)
+      const servicio = s.cita?.servicio || ""
+      const found = serviciosList.find((sv) => sv.slug === servicio)
+      return sum + (found?.precio || 0)
     }, 0)
 
     setStats({
