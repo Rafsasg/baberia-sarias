@@ -74,6 +74,7 @@ export default function LandingPage() {
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState("")
+  const [barberoEstado, setBarberoEstado] = useState<"disponible" | "ocupado">("disponible")
   const serviciosRef = useRef<HTMLDivElement>(null)
 
   const fechaStr = format(fecha, "yyyy-MM-dd")
@@ -81,14 +82,46 @@ export default function LandingPage() {
   const isDomingo = fecha.getDay() === 0
 
   useEffect(() => {
-    fetch("/api/servicios")
-      .then((r) => r.json())
-      .then((data) => {
-        const activos = (data.servicios || []).filter((s: ServicioItem) => s.activo)
-        setServicios(activos)
-        if (activos.length > 0) setSelectedServicio(activos[0].slug)
-      })
-      .catch(() => {})
+    let cancelled = false
+    async function init() {
+      try {
+        const [servRes, estadoRes] = await Promise.all([
+          fetch("/api/servicios"),
+          fetch("/api/auth/barbero-estado"),
+        ])
+        if (cancelled) return
+        if (servRes.ok) {
+          const servData = await servRes.json()
+          const activos = (servData.servicios || []).filter((s: ServicioItem) => s.activo)
+          setServicios(activos)
+          if (activos.length > 0) setSelectedServicio(activos[0].slug)
+        } else {
+          console.warn("Error cargando servicios:", servRes.status)
+        }
+        if (estadoRes.ok) {
+          const estadoData = await estadoRes.json()
+          setBarberoEstado(estadoData.estado || "disponible")
+        }
+      } catch (e) {
+        console.warn("Error en carga inicial:", e)
+      }
+    }
+    init()
+
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch("/api/auth/barbero-estado")
+        if (res.ok) {
+          const data = await res.json()
+          if (!cancelled) setBarberoEstado(data.estado)
+        }
+      } catch {}
+    }, 30000)
+
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+    }
   }, [])
 
   useEffect(() => {
@@ -103,6 +136,9 @@ export default function LandingPage() {
         const res = await fetch(`/api/citas/disponibilidad?fecha=${fechaStr}`)
         const data = await res.json()
         setSlots(data.slots || [])
+        if (data.barberoEstado) {
+          setBarberoEstado(data.barberoEstado)
+        }
       } catch {
         setSlots([])
       } finally {
@@ -276,9 +312,23 @@ export default function LandingPage() {
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[800px] rounded-full bg-primary/3 blur-3xl" />
 
         <div className="max-w-6xl mx-auto px-4 text-center relative">
-          <Badge variant="outline" className="mb-6 text-xs tracking-wider uppercase animate-fade-in">
-            Barbería Profesional
-          </Badge>
+          <div className="flex items-center justify-center gap-3 mb-6 animate-fade-in">
+            <Badge variant="outline" className="text-xs tracking-wider uppercase">
+              Barbería Profesional
+            </Badge>
+            <div className={cn(
+              "flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border",
+              barberoEstado === "disponible"
+                ? "bg-green-500/10 text-green-400 border-green-500/30"
+                : "bg-red-500/10 text-red-400 border-red-500/30"
+            )}>
+              <span className={cn(
+                "w-2 h-2 rounded-full",
+                barberoEstado === "disponible" ? "bg-green-400 animate-pulse" : "bg-red-400"
+              )} />
+              {barberoEstado === "disponible" ? "Disponible" : "Atendiendo cliente"}
+            </div>
+          </div>
           <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight mb-4 animate-slide-up">
             Cortes que
             <br />
@@ -288,12 +338,19 @@ export default function LandingPage() {
             Estilo, precisión y tradición en cada corte. Agenda tu cita y transforma tu look.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 animate-slide-up [animation-delay:300ms]">
-            <a href="#reserva">
-              <Button size="lg" className="text-base px-8 group">
-                Agenda tu cita
-                <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
-              </Button>
-            </a>
+            {barberoEstado === "disponible" ? (
+              <a href="#reserva">
+                <Button size="lg" className="text-base px-8 group">
+                  Agenda tu cita
+                  <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
+                </Button>
+              </a>
+            ) : (
+              <div className="px-6 py-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                El barbero está atendiendo a otro cliente. Vuelve a consultar más tarde.
+              </div>
+            )}
             <a
               href="https://wa.me/573182305080"
               target="_blank"
@@ -406,6 +463,18 @@ export default function LandingPage() {
             </p>
           </div>
 
+          {barberoEstado === "ocupado" && !submitted && (
+            <div className="max-w-md mx-auto mb-8 p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-center">
+              <div className="flex items-center justify-center gap-2 text-red-400 mb-1">
+                <AlertCircle className="w-5 h-5" />
+                <span className="font-medium">Barbero ocupado</span>
+              </div>
+              <p className="text-sm text-red-400/80">
+                El barbero está atendiendo a otro cliente en este momento. Los horarios disponibles se mostrarán cuando esté libre.
+              </p>
+            </div>
+          )}
+
           {submitted ? (
             <div className="max-w-md mx-auto text-center p-8 rounded-xl border border-primary/30 bg-primary/5 animate-scale-in">
               <div className="w-16 h-16 rounded-full bg-green-500/20 flex items-center justify-center mx-auto mb-4">
@@ -507,6 +576,16 @@ export default function LandingPage() {
                   ) : isDomingo ? (
                     <div className="text-center py-8 text-muted-foreground">
                       Cerrado los domingos
+                    </div>
+                  ) : barberoEstado === "ocupado" ? (
+                    <div className="text-center py-8">
+                      <div className="flex items-center justify-center gap-2 text-red-400 mb-2">
+                        <AlertCircle className="w-5 h-5" />
+                        <span className="font-medium">Barbero ocupado</span>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        El barbero está atendiendo otro cliente. Intenta más tarde o contáctalo por WhatsApp.
+                      </p>
                     </div>
                   ) : horasDisponibles.length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground">

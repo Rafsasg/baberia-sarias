@@ -65,6 +65,8 @@ export default function CitasPage() {
 
   useEffect(() => {
     cargarCitas()
+    const interval = setInterval(cargarCitas, 15000)
+    return () => clearInterval(interval)
   }, [cargarCitas])
 
   async function handleEstado(id: string, estado: "confirmada" | "cancelada") {
@@ -209,22 +211,24 @@ export default function CitasPage() {
                   )}
 
                   {cita.estado === "pendiente" && (
-                    <div className="flex gap-1">
+                    <div className="flex gap-2">
                       <Button
                         size="sm"
-                        variant="ghost"
-                        className="h-8 w-8 p-0 text-green-400 hover:text-green-300 hover:bg-green-500/10"
+                        variant="outline"
+                        className="h-9 px-3 text-green-400 border-green-500/30 hover:bg-green-500/20 hover:text-green-300 text-xs"
                         onClick={() => handleEstado(cita.id, "confirmada")}
                       >
-                        <CheckCircle2 className="w-4 h-4" />
+                        <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
+                        Aceptar
                       </Button>
                       <Button
                         size="sm"
-                        variant="ghost"
-                        className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                        variant="outline"
+                        className="h-9 px-3 text-red-400 border-red-500/30 hover:bg-red-500/20 hover:text-red-300 text-xs"
                         onClick={() => handleEstado(cita.id, "cancelada")}
                       >
-                        <X className="w-4 h-4" />
+                        <X className="w-3.5 h-3.5 mr-1" />
+                        Rechazar
                       </Button>
                     </div>
                   )}

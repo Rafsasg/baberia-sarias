@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS usuarios (
   password_hash TEXT NOT NULL,
   nombre TEXT NOT NULL DEFAULT 'Barbero',
   telefono TEXT,
+  estado TEXT NOT NULL DEFAULT 'disponible' CHECK (estado IN ('disponible', 'ocupado')),
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
@@ -107,12 +108,13 @@ CREATE POLICY "Barbero puede gestionar servicios"
 
 -- 7. SEED: Crear usuario barbero por defecto
 -- Password: admin123 (cambiar en producción)
-INSERT INTO usuarios (email, password_hash, nombre, telefono)
+INSERT INTO usuarios (email, password_hash, nombre, telefono, estado)
 VALUES (
   'barbero@baberiasarias.com',
   '$2b$10$MrosmvhQEmYhbmCDa5hyC.LWRAdLsLy356JbgVgsg6uykOH5DFBGK',
   'Barbero',
-  '+573182305080'
+  '+573182305080',
+  'disponible'
 )
 ON CONFLICT (email) DO NOTHING;
 

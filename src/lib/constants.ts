@@ -1,7 +1,7 @@
 export const HORARIO_INICIO = "09:00"
 export const HORARIO_FIN = "20:00"
 export const DURACION_SLOT = 30
-export const TIEMPO_CONFIRMACION_MIN = 5
+export const TIEMPO_CONFIRMACION_MIN = 120
 
 export const PRECIOS: Record<string, number> = {
   corte: 15000,

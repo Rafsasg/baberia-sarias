@@ -4,6 +4,7 @@ export type ServicioSlug = "corte" | "barba" | "combo"
 export type MetodoPago = "efectivo" | "transferencia"
 export type TransaccionTipo = "ingreso" | "egreso"
 export type CategoriaEgreso = "suministros" | "servicios" | "marketing" | "otros"
+export type BarberoEstado = "disponible" | "ocupado"
 
 export interface Cita {
   id: string
@@ -35,6 +36,7 @@ export interface Usuario {
   email: string
   nombre: string
   telefono: string | null
+  estado: BarberoEstado
   created_at: string
 }
 

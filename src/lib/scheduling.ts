@@ -49,6 +49,21 @@ export async function verificarDisponibilidad(params: SlotParams): Promise<boole
   return data === null || data.length === 0
 }
 
+export async function obtenerEstadoBarbero(): Promise<"disponible" | "ocupado"> {
+  try {
+    const supabase = createSupabaseAdminClient()
+    const { data, error } = await supabase
+      .from("usuarios")
+      .select("estado")
+      .eq("email", "barbero@baberiasarias.com")
+      .single()
+    if (error || !data) return "disponible"
+    return data.estado as "disponible" | "ocupado"
+  } catch {
+    return "disponible"
+  }
+}
+
 export async function obtenerSlots(fecha: string): Promise<TimeSlot[]> {
   await limpiarPendientesExpiradas().catch(err => console.error("Error auto-limpiando citas:", err))
   const supabase = createSupabaseAdminClient()
@@ -61,6 +76,26 @@ export async function obtenerSlots(fecha: string): Promise<TimeSlot[]> {
     .order("hora_inicio", { ascending: true })
 
   if (error) throw new Error(`Error obteniendo slots: ${error.message}`)
+
+  const barberoStatus = await obtenerEstadoBarbero()
+
+  if (barberoStatus === "ocupado") {
+    const slots: TimeSlot[] = []
+    const [horaIniH, horaIniM] = HORARIO_INICIO.split(":").map(Number)
+    const [horaFinH, horaFinM] = HORARIO_FIN.split(":").map(Number)
+    const inicioMinutos = horaIniH * 60 + horaIniM
+    const finMinutos = horaFinH * 60 + horaFinM
+    for (let m = inicioMinutos; m < finMinutos; m += DURACION_SLOT) {
+      const h = Math.floor(m / 60)
+      const min = m % 60
+      const inicio = `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`
+      const hFin = Math.floor((m + DURACION_SLOT) / 60)
+      const minFin = (m + DURACION_SLOT) % 60
+      const fin = `${String(hFin).padStart(2, "0")}:${String(minFin).padStart(2, "0")}`
+      slots.push({ hora_inicio: inicio, hora_fin: fin, estado: "ocupado" })
+    }
+    return slots
+  }
 
   const slots: TimeSlot[] = []
   const [horaIniH, horaIniM] = HORARIO_INICIO.split(":").map(Number)

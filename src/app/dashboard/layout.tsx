@@ -11,6 +11,8 @@ import {
   LogOut,
   Menu,
   X,
+  Wifi,
+  WifiOff,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -32,28 +34,74 @@ export default function DashboardLayout({
   const router = useRouter()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [userName, setUserName] = useState("Barbero")
+  const [barberoEstado, setBarberoEstado] = useState<"disponible" | "ocupado">("disponible")
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    let cancelled = false
     async function checkAuth() {
       try {
-        const res = await fetch("/api/auth/me")
-        if (!res.ok) {
+        const [meRes, estadoRes] = await Promise.all([
+          fetch("/api/auth/me"),
+          fetch("/api/auth/barbero-estado"),
+        ])
+        if (!meRes.ok) {
           router.push("/login")
           return
         }
-        const data = await res.json()
-        if (data.user) {
-          setUserName(data.user.email?.split("@")[0] || "Barbero")
+        const meData = await meRes.json()
+        if (meData.user) {
+          setUserName(meData.user.email?.split("@")[0] || "Barbero")
+        }
+        if (estadoRes.ok) {
+          const estadoData = await estadoRes.json()
+          if (!cancelled) setBarberoEstado(estadoData.estado)
         }
       } catch {
         router.push("/login")
       } finally {
-        setLoading(false)
+        if (!cancelled) setLoading(false)
       }
     }
     checkAuth()
+
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch("/api/auth/barbero-estado")
+        if (res.ok) {
+          const data = await res.json()
+          if (!cancelled) setBarberoEstado(data.estado)
+        }
+      } catch {}
+    }, 15000)
+
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+    }
   }, [router])
+
+  async function toggleEstado() {
+    const prev = barberoEstado
+    const nuevoEstado = prev === "disponible" ? "ocupado" : "disponible"
+    setBarberoEstado(nuevoEstado)
+    try {
+      const res = await fetch("/api/auth/barbero-estado", {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ estado: nuevoEstado }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        console.error("Error al cambiar estado:", res.status, err)
+        setBarberoEstado(prev)
+      }
+    } catch (e) {
+      console.error("Error de red al cambiar estado:", e)
+      setBarberoEstado(prev)
+    }
+  }
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" })
@@ -115,8 +163,8 @@ export default function DashboardLayout({
             })}
           </nav>
 
-          <div className="p-4 border-t border-border">
-            <div className="flex items-center gap-3 mb-3">
+          <div className="p-4 border-t border-border space-y-2">
+            <div className="flex items-center gap-3 mb-2">
               <Avatar className="h-8 w-8">
                 <AvatarFallback className="bg-primary/20 text-primary text-xs">
                   {userName.charAt(0).toUpperCase()}
@@ -124,6 +172,24 @@ export default function DashboardLayout({
               </Avatar>
               <span className="text-sm font-medium truncate">{userName}</span>
             </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn(
+                "w-full justify-start gap-2",
+                barberoEstado === "disponible"
+                  ? "text-green-400 hover:text-green-300 hover:bg-green-500/10"
+                  : "text-red-400 hover:text-red-300 hover:bg-red-500/10"
+              )}
+              onClick={toggleEstado}
+            >
+              {barberoEstado === "disponible" ? (
+                <Wifi className="w-4 h-4" />
+              ) : (
+                <WifiOff className="w-4 h-4" />
+              )}
+              {barberoEstado === "disponible" ? "Disponible" : "Ocupado"}
+            </Button>
             <Button
               variant="ghost"
               size="sm"

@@ -14,6 +14,7 @@ import {
   UserPlus,
   X,
   Wallet,
+  Bell,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -63,6 +64,7 @@ export default function DashboardHome() {
   })
   const [walkInLoading, setWalkInLoading] = useState(false)
   const [stats, setStats] = useState({ total: 0, confirmadas: 0, pendientes: 0, ingresos: 0 })
+  const [pendingCitas, setPendingCitas] = useState<(TimeSlot & { cita: Cita })[]>([])
 
   const fechaStr = format(fecha, "yyyy-MM-dd")
 
@@ -84,8 +86,14 @@ export default function DashboardHome() {
     try {
       const res = await fetch(`/api/citas/disponibilidad?fecha=${fechaStr}`)
       const data = await res.json()
-      setSlots(data.slots || [])
-      calcularStats(data.slots || [])
+      const slotsList = data.slots || []
+      setSlots(slotsList)
+      calcularStats(slotsList)
+      setPendingCitas(
+        slotsList.filter(
+          (s: TimeSlot) => s.estado === "pendiente" && s.cita
+        )
+      )
     } catch (err) {
       console.error(err)
     } finally {
@@ -95,6 +103,8 @@ export default function DashboardHome() {
 
   useEffect(() => {
     cargarSlots()
+    const interval = setInterval(cargarSlots, 15000)
+    return () => clearInterval(interval)
   }, [cargarSlots])
 
   function calcularStats(slotsList: TimeSlot[]) {
@@ -214,6 +224,60 @@ export default function DashboardHome() {
         </div>
       </div>
 
+      {pendingCitas.length > 0 && (
+        <Card className="border-yellow-500/30 bg-yellow-500/5">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 mb-3 text-yellow-400">
+              <Bell className="w-5 h-5" />
+              <span className="font-semibold">
+                {pendingCitas.length} cita{pendingCitas.length > 1 ? "s" : ""} pendiente{pendingCitas.length > 1 ? "s" : ""} por confirmar
+              </span>
+            </div>
+            <div className="space-y-2">
+              {pendingCitas.map((slot) => (
+                <div
+                  key={slot.hora_inicio}
+                  className="flex items-center gap-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg px-4 py-3"
+                >
+                  <span className="text-sm font-mono text-yellow-400">
+                    {slot.hora_inicio}
+                  </span>
+                  <span className="flex-1 text-sm font-medium text-yellow-300">
+                    {slot.cita!.cliente_nombre}
+                  </span>
+                  <Badge variant="outline" className="text-xs border-yellow-500/30 text-yellow-400">
+                    {serviciosList.find((s) => s.slug === slot.cita!.servicio)?.nombre || slot.cita!.servicio}
+                  </Badge>
+                  <Badge variant="info" className="text-xs">
+                    Web
+                  </Badge>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-9 px-4 text-green-400 border-green-500/30 hover:bg-green-500/20 hover:text-green-300"
+                      onClick={() => handleConfirmarCita(slot.cita!.id)}
+                    >
+                      <CheckCircle2 className="w-4 h-4 mr-1.5" />
+                      Aceptar
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-9 px-4 text-red-400 border-red-500/30 hover:bg-red-500/20 hover:text-red-300"
+                      onClick={() => handleCancelarCita(slot.cita!.id)}
+                    >
+                      <X className="w-4 h-4 mr-1.5" />
+                      Rechazar
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <Card>
           <CardHeader className="p-4 pb-2">
@@ -257,12 +321,14 @@ export default function DashboardHome() {
         </Card>
       </div>
 
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Clock className="w-4 h-4" />
-          <span>
-            {slotsDisponibles} slots disponibles de {slots.length}
-          </span>
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Clock className="w-4 h-4" />
+            <span>
+              {slotsDisponibles} slots disponibles de {slots.length}
+            </span>
+          </div>
         </div>
         <Button onClick={() => setShowWalkIn(true)}>
           <UserPlus className="w-4 h-4 mr-2" />
@@ -334,22 +400,24 @@ export default function DashboardHome() {
                     </div>
 
                     {slot.estado === "pendiente" && slot.cita && (
-                      <div className="flex gap-1 shrink-0">
+                      <div className="flex gap-2 shrink-0">
                         <Button
                           size="sm"
-                          variant="ghost"
-                          className="h-8 px-2 text-green-400 hover:text-green-300 hover:bg-green-500/10"
+                          variant="outline"
+                          className="h-9 px-3 text-green-400 border-green-500/30 hover:bg-green-500/20 hover:text-green-300 text-xs"
                           onClick={() => handleConfirmarCita(slot.cita!.id)}
                         >
-                          <CheckCircle2 className="w-4 h-4" />
+                          <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
+                          Aceptar
                         </Button>
                         <Button
                           size="sm"
-                          variant="ghost"
-                          className="h-8 px-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          variant="outline"
+                          className="h-9 px-3 text-red-400 border-red-500/30 hover:bg-red-500/20 hover:text-red-300 text-xs"
                           onClick={() => handleCancelarCita(slot.cita!.id)}
                         >
-                          <X className="w-4 h-4" />
+                          <X className="w-3.5 h-3.5 mr-1" />
+                          Rechazar
                         </Button>
                       </div>
                     )}
