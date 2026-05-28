@@ -4,16 +4,14 @@ import { useState, useEffect, useCallback } from "react"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import {
-  ChevronLeft,
-  ChevronRight,
-  Plus,
   Scissors,
   Clock,
   CheckCircle2,
   AlertCircle,
   UserPlus,
   X,
-  Wallet,
+  Wifi,
+  WifiOff,
   Bell,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -46,7 +44,6 @@ function getStatusInfo(estado: string) {
 }
 
 export default function DashboardHome() {
-  const [fecha, setFecha] = useState(new Date())
   const [slots, setSlots] = useState<TimeSlot[]>([])
   const [loading, setLoading] = useState(true)
   const [showWalkIn, setShowWalkIn] = useState(false)
@@ -65,8 +62,10 @@ export default function DashboardHome() {
   const [walkInLoading, setWalkInLoading] = useState(false)
   const [stats, setStats] = useState({ total: 0, confirmadas: 0, pendientes: 0, ingresos: 0 })
   const [pendingCitas, setPendingCitas] = useState<(TimeSlot & { cita: Cita })[]>([])
+  const [barberoEstado, setBarberoEstado] = useState<"disponible" | "ocupado">("disponible")
+  const [currentTime, setCurrentTime] = useState(new Date())
 
-  const fechaStr = format(fecha, "yyyy-MM-dd")
+  const fechaStr = format(new Date(), "yyyy-MM-dd")
 
   useEffect(() => {
     fetch("/api/servicios")
@@ -74,7 +73,7 @@ export default function DashboardHome() {
       .then((data) => {
         const activos = (data.servicios || []).filter((s: { slug: string; activo: boolean }) => s.activo)
         setServiciosList(activos)
-        if (activos.length > 0 && !activos.find((s: { slug: string }) => s.slug === walkInForm.servicio)) {
+        if (activos.length > 0 && !activos.find((s: { slug: string }) => s.slug === "corte")) {
           setWalkInForm((prev) => ({ ...prev, servicio: activos[0].slug }))
         }
       })
@@ -104,8 +103,25 @@ export default function DashboardHome() {
   useEffect(() => {
     cargarSlots()
     const interval = setInterval(cargarSlots, 15000)
-    return () => clearInterval(interval)
+    const clock = setInterval(() => setCurrentTime(new Date()), 1000)
+    return () => {
+      clearInterval(interval)
+      clearInterval(clock)
+    }
   }, [cargarSlots])
+
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch("/api/auth/barbero-estado")
+        if (res.ok) {
+          const data = await res.json()
+          setBarberoEstado(data.estado)
+        }
+      } catch {}
+    }, 15000)
+    return () => clearInterval(interval)
+  }, [])
 
   function calcularStats(slotsList: TimeSlot[]) {
     const confirmadas = slotsList.filter((s) => s.estado === "confirmada")
@@ -122,12 +138,6 @@ export default function DashboardHome() {
       pendientes: pendientes.length,
       ingresos,
     })
-  }
-
-  function cambiarFecha(dias: number) {
-    const nueva = new Date(fecha)
-    nueva.setDate(nueva.getDate() + dias)
-    setFecha(nueva)
   }
 
   async function handleWalkInSubmit(e: React.FormEvent) {
@@ -190,40 +200,88 @@ export default function DashboardHome() {
     if (res.ok) cargarSlots()
   }
 
-  const hoy = format(new Date(), "yyyy-MM-dd")
-  const esHoy = fechaStr === hoy
-  const slotsDisponibles = slots.filter((s) => s.estado === "disponible").length
+  async function toggleEstado() {
+    const nuevoEstado = barberoEstado === "disponible" ? "ocupado" : "disponible"
+    setBarberoEstado(nuevoEstado)
+    await fetch("/api/auth/barbero-estado", {
+      method: "PUT",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ estado: nuevoEstado }),
+    })
+  }
 
   const horasOcupadas = slots
     .filter((s) => s.estado === "confirmada" || s.estado === "pendiente")
     .map((s) => s.hora_inicio)
 
+  const timeDisplay = format(currentTime, "hh:mm a")
+  const dateDisplay = format(currentTime, "EEEE d 'de' MMMM", { locale: es })
+
   return (
     <div className="space-y-6">
+      {/* Header with live clock and date */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">
-            {esHoy ? "Hoy" : format(fecha, "EEEE d", { locale: es })}
-          </h1>
-          <p className="text-muted-foreground text-sm">
-            {format(fecha, "d 'de' MMMM, yyyy", { locale: es })}
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold capitalize">{dateDisplay}</h1>
+          </div>
+          <p className="text-muted-foreground text-sm mt-1 flex items-center gap-2">
+            <Clock className="w-4 h-4" />
+            <span className="text-lg font-mono font-semibold text-foreground">{timeDisplay}</span>
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" onClick={() => cambiarFecha(-1)}>
-            <ChevronLeft className="w-4 h-4" />
-          </Button>
-          {!esHoy && (
-            <Button variant="outline" size="sm" onClick={() => setFecha(new Date())}>
-              Hoy
-            </Button>
-          )}
-          <Button variant="outline" size="icon" onClick={() => cambiarFecha(1)}>
-            <ChevronRight className="w-4 h-4" />
-          </Button>
-        </div>
+        <Button onClick={() => setShowWalkIn(true)}>
+          <UserPlus className="w-4 h-4 mr-2" />
+          Walk-in
+        </Button>
       </div>
 
+      {/* Status toggle */}
+      <Card className={cn(
+        "border-2 transition-colors",
+        barberoEstado === "disponible"
+          ? "border-green-500/30 bg-green-500/5"
+          : "border-red-500/30 bg-red-500/5"
+      )}>
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-muted-foreground mb-1">Estado actual</p>
+              <p className={cn(
+                "text-2xl font-bold flex items-center gap-2",
+                barberoEstado === "disponible" ? "text-green-400" : "text-red-400"
+              )}>
+                <span className={cn(
+                  "w-3 h-3 rounded-full",
+                  barberoEstado === "disponible"
+                    ? "bg-green-400 animate-pulse"
+                    : "bg-red-400"
+                )} />
+                {barberoEstado === "disponible" ? "Disponible" : "Ocupado"}
+              </p>
+            </div>
+            <Button
+              size="lg"
+              onClick={toggleEstado}
+              className={cn(
+                "px-8 text-base font-semibold transition-all",
+                barberoEstado === "disponible"
+                  ? "bg-red-500/20 text-red-400 border-red-500/30 hover:bg-red-500/30 border"
+                  : "bg-green-500/20 text-green-400 border-green-500/30 hover:bg-green-500/30 border"
+              )}
+            >
+              {barberoEstado === "disponible" ? (
+                <><WifiOff className="w-5 h-5 mr-2" />Marcar como Ocupado</>
+              ) : (
+                <><Wifi className="w-5 h-5 mr-2" />Marcar como Disponible</>
+              )}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Pending citas banner */}
       {pendingCitas.length > 0 && (
         <Card className="border-yellow-500/30 bg-yellow-500/5">
           <CardContent className="p-4">
@@ -278,12 +336,11 @@ export default function DashboardHome() {
         </Card>
       )}
 
+      {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <Card>
           <CardHeader className="p-4 pb-2">
-            <CardTitle className="text-xs font-medium text-muted-foreground">
-              Citas Hoy
-            </CardTitle>
+            <CardTitle className="text-xs font-medium text-muted-foreground">Citas Hoy</CardTitle>
           </CardHeader>
           <CardContent className="p-4 pt-0">
             <p className="text-2xl font-bold">{stats.total}</p>
@@ -291,9 +348,7 @@ export default function DashboardHome() {
         </Card>
         <Card>
           <CardHeader className="p-4 pb-2">
-            <CardTitle className="text-xs font-medium text-muted-foreground">
-              Confirmadas
-            </CardTitle>
+            <CardTitle className="text-xs font-medium text-muted-foreground">Confirmadas</CardTitle>
           </CardHeader>
           <CardContent className="p-4 pt-0">
             <p className="text-2xl font-bold text-green-400">{stats.confirmadas}</p>
@@ -301,9 +356,7 @@ export default function DashboardHome() {
         </Card>
         <Card>
           <CardHeader className="p-4 pb-2">
-            <CardTitle className="text-xs font-medium text-muted-foreground">
-              Pendientes
-            </CardTitle>
+            <CardTitle className="text-xs font-medium text-muted-foreground">Pendientes</CardTitle>
           </CardHeader>
           <CardContent className="p-4 pt-0">
             <p className="text-2xl font-bold text-yellow-400">{stats.pendientes}</p>
@@ -311,9 +364,7 @@ export default function DashboardHome() {
         </Card>
         <Card>
           <CardHeader className="p-4 pb-2">
-            <CardTitle className="text-xs font-medium text-muted-foreground">
-              Ingresos
-            </CardTitle>
+            <CardTitle className="text-xs font-medium text-muted-foreground">Ingresos</CardTitle>
           </CardHeader>
           <CardContent className="p-4 pt-0">
             <p className="text-2xl font-bold text-primary">{formatoCOP(stats.ingresos)}</p>
@@ -321,21 +372,7 @@ export default function DashboardHome() {
         </Card>
       </div>
 
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Clock className="w-4 h-4" />
-            <span>
-              {slotsDisponibles} slots disponibles de {slots.length}
-            </span>
-          </div>
-        </div>
-        <Button onClick={() => setShowWalkIn(true)}>
-          <UserPlus className="w-4 h-4 mr-2" />
-          Walk-in
-        </Button>
-      </div>
-
+      {/* Today's appointments */}
       <Card>
         <CardContent className="p-0">
           {loading ? (
@@ -344,7 +381,7 @@ export default function DashboardHome() {
             </div>
           ) : slots.length === 0 ? (
             <div className="p-8 text-center text-muted-foreground">
-              No hay horarios disponibles para este día
+              No hay horarios disponibles para hoy
             </div>
           ) : (
             <div className="divide-y divide-border">
@@ -429,17 +466,14 @@ export default function DashboardHome() {
         </CardContent>
       </Card>
 
+      {/* Walk-in modal */}
       {showWalkIn && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
           <Card className="w-full max-w-md">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>Registrar Walk-in</CardTitle>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setShowWalkIn(false)}
-                >
+                <Button variant="ghost" size="icon" onClick={() => setShowWalkIn(false)}>
                   <X className="w-4 h-4" />
                 </Button>
               </div>
@@ -451,9 +485,7 @@ export default function DashboardHome() {
                   <Input
                     placeholder="Ej: Juan Pérez"
                     value={walkInForm.cliente_nombre}
-                    onChange={(e) =>
-                      setWalkInForm({ ...walkInForm, cliente_nombre: e.target.value })
-                    }
+                    onChange={(e) => setWalkInForm({ ...walkInForm, cliente_nombre: e.target.value })}
                     required
                     autoFocus
                   />
@@ -462,18 +494,14 @@ export default function DashboardHome() {
                   <Label>Servicio</Label>
                   <Select
                     value={walkInForm.servicio}
-                    onValueChange={(v: string) =>
-                      setWalkInForm({ ...walkInForm, servicio: v })
-                    }
+                    onValueChange={(v: string) => setWalkInForm({ ...walkInForm, servicio: v })}
                   >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       {serviciosList.map((s) => (
-                        <SelectItem key={s.slug} value={s.slug}>
-                          {s.nombre}
-                        </SelectItem>
+                        <SelectItem key={s.slug} value={s.slug}>{s.nombre}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -482,9 +510,7 @@ export default function DashboardHome() {
                   <Label>Hora de inicio</Label>
                   <Select
                     value={walkInForm.hora_inicio}
-                    onValueChange={(v) =>
-                      setWalkInForm({ ...walkInForm, hora_inicio: v })
-                    }
+                    onValueChange={(v) => setWalkInForm({ ...walkInForm, hora_inicio: v })}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Seleccionar hora" />
@@ -494,19 +520,13 @@ export default function DashboardHome() {
                         const opciones: string[] = []
                         for (let h = 9; h < 20; h++) {
                           for (const m of [0, 30]) {
-                            const hora = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`
-                            opciones.push(hora)
+                            opciones.push(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`)
                           }
                         }
                         return opciones
                       })().map((hora) => (
-                        <SelectItem
-                          key={hora}
-                          value={hora}
-                          disabled={horasOcupadas.includes(hora)}
-                        >
-                          {hora}
-                          {horasOcupadas.includes(hora) ? " (ocupado)" : ""}
+                        <SelectItem key={hora} value={hora} disabled={horasOcupadas.includes(hora)}>
+                          {hora}{horasOcupadas.includes(hora) ? " (ocupado)" : ""}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -516,9 +536,7 @@ export default function DashboardHome() {
                   <Label>Método de pago</Label>
                   <Select
                     value={walkInForm.metodo_pago}
-                    onValueChange={(v: "efectivo" | "transferencia") =>
-                      setWalkInForm({ ...walkInForm, metodo_pago: v })
-                    }
+                    onValueChange={(v: "efectivo" | "transferencia") => setWalkInForm({ ...walkInForm, metodo_pago: v })}
                   >
                     <SelectTrigger>
                       <SelectValue />

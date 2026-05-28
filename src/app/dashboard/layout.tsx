@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import Link from "next/link"
 import {
@@ -36,6 +36,7 @@ export default function DashboardLayout({
   const [userName, setUserName] = useState("Barbero")
   const [barberoEstado, setBarberoEstado] = useState<"disponible" | "ocupado">("disponible")
   const [loading, setLoading] = useState(true)
+  const lastToggleRef = useRef(0)
 
   useEffect(() => {
     let cancelled = false
@@ -66,6 +67,7 @@ export default function DashboardLayout({
     checkAuth()
 
     const interval = setInterval(async () => {
+      if (Date.now() - lastToggleRef.current < 20000) return
       try {
         const res = await fetch("/api/auth/barbero-estado")
         if (res.ok) {
@@ -84,6 +86,8 @@ export default function DashboardLayout({
   async function toggleEstado() {
     const prev = barberoEstado
     const nuevoEstado = prev === "disponible" ? "ocupado" : "disponible"
+    const now = Date.now()
+    lastToggleRef.current = now
     setBarberoEstado(nuevoEstado)
     try {
       const res = await fetch("/api/auth/barbero-estado", {
@@ -95,11 +99,11 @@ export default function DashboardLayout({
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
         console.error("Error al cambiar estado:", res.status, err)
-        setBarberoEstado(prev)
+        if (lastToggleRef.current === now) setBarberoEstado(prev)
       }
     } catch (e) {
       console.error("Error de red al cambiar estado:", e)
-      setBarberoEstado(prev)
+      if (lastToggleRef.current === now) setBarberoEstado(prev)
     }
   }
 
